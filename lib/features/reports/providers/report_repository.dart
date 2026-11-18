@@ -1,13 +1,19 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../auth/providers/business_repository.dart';
 
 class ReportRepository {
   final _client = Supabase.instance.client;
+  final _businessRepository = BusinessRepository();
 
   // Obtener el resumen general (Total de dinero y cantidad de ventas)
   Future<Map<String, dynamic>> getSalesSummary() async {
     try {
-      final response = await _client.from('sales').select('id, total');
-      
+final businessId = await _businessRepository.getCurrentBusinessId();
+
+final response = await _client
+    .from('sales')
+    .select('id, total')
+    .eq('business_id', businessId);      
       double totalRevenue = 0.0;
       int totalTransactions = response.length;
 
@@ -40,12 +46,14 @@ class ReportRepository {
   // Obtener el historial cronológico (Las últimas 50 ventas)
   Future<List<Map<String, dynamic>>> getRecentSales() async {
     try {
-      final response = await _client
-          .from('sales')
-          .select('*')
-          .order('created_at', ascending: false)
-          .limit(50);
-      
+      final businessId = await _businessRepository.getCurrentBusinessId();
+
+final response = await _client
+    .from('sales')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('created_at', ascending: false)
+    .limit(50);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       print('Error al obtener las ventas recientes: $e');
@@ -55,10 +63,13 @@ class ReportRepository {
   // Eliminar una venta por su ID
   Future<void> deleteSale(int saleId) async {
     try {
-      await _client
-          .from('sales')
-          .delete()
-          .eq('id', saleId);
+      final businessId = await _businessRepository.getCurrentBusinessId();
+
+await _client
+    .from('sales')
+    .delete()
+    .eq('id', saleId)
+    .eq('business_id', businessId);
     } catch (e) {
       print('Error al eliminar la venta: $e');
       throw Exception('No se pudo eliminar el reporte.');

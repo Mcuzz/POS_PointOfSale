@@ -1,57 +1,102 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
+import '../../auth/providers/business_repository.dart';
 
 class ProductRepository {
-  // Obtenemos la instancia de Supabase
   final _client = Supabase.instance.client;
+  final _businessRepository = BusinessRepository();
+  Future<void> insertProduct(Product product) async {
+  final businessId = await _businessRepository.getCurrentBusinessId();
 
-  // 1. REQUERIMIENTO: Registro de Productos
- Future<void> insertProduct(Product product) async {
-    final data = product.toMap();
-    data.remove('id');
+  final data = product.toMap();
+  data.remove('id');
+  data['business_id'] = businessId;
 
-    await _client.from('products').insert(data);
-  }
+  await _client.from('products').insert(data);
+}
 
-  // 2. Obtener todos los productos
-  Future<List<Product>> getAllProducts() async {
-    final response = await _client.from('products').select();
-    return response.map((json) => Product.fromMap(json)).toList();
-  }
+Future<List<Product>> getAllProducts() async {
+  final businessId = await _businessRepository.getCurrentBusinessId();
 
-  // 3. Búsqueda por nombre o SKU
-  Future<List<Product>> searchProducts(String query) async {
-    final response = await _client
-        .from('products')
-        .select()
-        .or('name.ilike.%$query%,sku.ilike.%$query%'); // Búsqueda sensible o insensible a mayúsculas
-    
-    return response.map((json) => Product.fromMap(json)).toList();
-  }
+  final response = await _client
+      .from('products')
+      .select()
+      .eq('business_id', businessId);
 
-  // 4. REQUERIMIENTO: Edición de Atributos
-  Future<void> updateProduct(Product product) async {
-    await _client.from('products').update(product.toMap()).eq('id', product.id!);
-  }
+  return response.map((json) => Product.fromMap(json)).toList();
+}
 
-  // 5. REQUERIMIENTO: Control de Stock Rápido
-  Future<void> updateStock(int id, int newStock) async {
-    await _client.from('products').update({'stock': newStock}).eq('id', id);
-  }
+Future<List<Product>> searchProducts(String query) async {
+  final businessId = await _businessRepository.getCurrentBusinessId();
 
-  // 6. REQUERIMIENTO: Eliminación de Registros
-  Future<void> deleteProduct(int id) async {
-    await _client.from('products').delete().eq('id', id);
-  }
+  final response = await _client
+      .from('products')
+      .select()
+      .eq('business_id', businessId)
+      .or('name.ilike.%$query%,sku.ilike.%$query%');
 
-  // --- GESTIÓN DE CATEGORÍAS ---
+  return response.map((json) => Product.fromMap(json)).toList();
+}
 
-  Future<List<String>> getCategories() async {
-    final response = await _client.from('categories').select('name');
-    return response.map((item) => item['name'] as String).toList();
-  }
+Future<void> updateProduct(Product product) async {
+  final businessId = await _businessRepository.getCurrentBusinessId();
 
-  Future<void> insertCategory(String name) async {
-    await _client.from('categories').upsert({'name': name}, onConflict: 'name');
-  }
+  final data = product.toMap();
+  data.remove('business_id');
+
+  await _client
+      .from('products')
+      .update(data)
+      .eq('id', product.id!)
+      .eq('business_id', businessId);
+}
+
+Future<void> updateStock(int id, int newStock) async {
+  final businessId = await _businessRepository.getCurrentBusinessId();
+
+  await _client
+      .from('products')
+      .update({'stock': newStock})
+      .eq('id', id)
+      .eq('business_id', businessId);
+}
+
+Future<void> deleteProduct(int id) async {
+  final businessId = await _businessRepository.getCurrentBusinessId();
+
+  await _client
+      .from('products')
+      .delete()
+      .eq('id', id)
+      .eq('business_id', businessId);
+}
+
+Future<List<String>> getCategories() async {
+  final businessId = await _businessRepository.getCurrentBusinessId();
+
+  final response = await _client
+      .from('categories')
+      .select('name')
+      .eq('business_id', businessId);
+
+  return response.map((item) => item['name'] as String).toList();
+}
+
+Future<void> insertCategory(String name) async {
+  final businessId = await _businessRepository.getCurrentBusinessId();
+
+  final existing = await _client
+      .from('categories')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('name', name)
+      .limit(1);
+
+  if (existing.isNotEmpty) return;
+
+  await _client.from('categories').insert({
+    'name': name,
+    'business_id': businessId,
+  });
+}
 }
