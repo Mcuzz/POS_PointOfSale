@@ -45,24 +45,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // Importa el widget arriba: import '../widgets/product_form_dialog.dart';
 
   Future<void> _showProductForm({Product? product}) async {
-    // Abrimos el Dialog y esperamos el resultado
-    final result = await showDialog<Product>(
+    await showDialog<bool>(
       context: context,
-      barrierDismissible: false, // Obliga a usar los botones para cerrar
-      builder: (context) => ProductFormDialog(product: product),
+      barrierDismissible: false,
+      builder: (context) => ProductFormDialog(
+        product: product,
+        onSave: (savedProduct) async {
+          if (product == null) {
+            await _repository.insertProduct(savedProduct);
+          } else {
+            await _repository.updateProduct(savedProduct);
+          }
+        },
+      ),
     );
 
-    // Si el usuario presionó "Guardar Producto", el result no será null
-    if (result != null) {
-      if (product == null) {
-        // Modo Creación
-        await _repository.insertProduct(result);
-      } else {
-        // Modo Edición
-        await _repository.updateProduct(result);
-      }
-      _loadProducts(); // Refrescamos la tabla
-    }
+    if (!mounted) return;
+
+    await _loadProducts();
   }
 
   // Eliminar producto

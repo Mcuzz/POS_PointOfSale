@@ -1,0 +1,41 @@
+{
+  "name": "POS Terrasita",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "PUB_CACHE": "/home/vscode/.pub-cache"
+  },
+  "mounts": [
+    "source=pos-terrasita-pub-cache,target=/home/vscode/.pub-cache,type=volume"
+  ],
+  "forwardPorts": [8080, 5000, 9005],
+  "portsAttributes": {
+    "8080": {
+      "label": "Flutter Web Dev Server",
+      "onAutoForward": "notify"
+    },
+    "5000": {
+      "label": "Firebase Hosting",
+      "onAutoForward": "notify"
+    },
+    "9005": {
+      "label": "Firebase CLI Auth",
+      "onAutoForward": "silent"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Dart-Code.dart-code",
+        "Dart-Code.flutter"
+      ],
+      "settings": {
+        "dart.flutterSdkPath": "/opt/flutter",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+"postCreateCommand": "bash -c 'sudo chown -R vscode:vscode /home/vscode/.pub-cache && if [ ! -f .env ] && [ -f .env.example ]; then cp .env.example .env; fi && flutter pub get'"}
