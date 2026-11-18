@@ -63,15 +63,63 @@ class _TerminalScreenState extends State<TerminalScreen> {
     });
   }
 
-  void _removeFromCart(int index) {
+  Future<void> _removeFromCart(int index) async {
+  if (index < 0 || index >= _cart.length) return;
+
+  final item = _cart[index];
+
+  // Si hay varias unidades, solamente reducimos la cantidad.
+  if (item.quantity > 1) {
     setState(() {
-      if (_cart[index].quantity > 1) {
-        _cart[index].quantity--;
-      } else {
-        _cart.removeAt(index);
-      }
+      item.quantity--;
     });
+    return;
   }
+
+  // Si queda una unidad, solicitamos confirmación.
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Eliminar producto'),
+        content: Text(
+          '¿Estás segura de que deseas retirar '
+          '"${item.product.name}" del carrito?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(false);
+            },
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      );
+    },
+  );
+
+  // Si cancela, no modificamos el carrito.
+  if (confirmed != true || !mounted) return;
+
+  // Comprobamos que el artículo siga dentro del carrito.
+  final currentIndex = _cart.indexOf(item);
+
+  if (currentIndex == -1) return;
+
+  setState(() {
+    _cart.removeAt(currentIndex);
+  });
+}
 
   double get _cartTotal {
     return _cart.fold(0, (sum, item) => sum + item.total);

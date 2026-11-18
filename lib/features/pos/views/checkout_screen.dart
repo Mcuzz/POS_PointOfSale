@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:punto_venta/features/pos/models/car_item.dart';
 import '../providers/sale_repository.dart'; 
+import 'package:flutter/services.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final List<CartItem> cart;
@@ -20,6 +21,8 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final SaleRepository _saleRepo = SaleRepository();
+  final TextEditingController _amountController =
+    TextEditingController(text: '0');
 
   String _amountTenderedStr = "0";
   String _paymentMethod = "Efectivo";
@@ -29,27 +32,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double get _change => _amountTendered - widget.totalToPay;
 
   void _onKeypadPressed(String value) {
-    setState(() {
-      if (value == 'C') {
-        _amountTenderedStr = "0";
-      } else if (value == 'DEL') {
-        if (_amountTenderedStr.length > 1) {
-          _amountTenderedStr = _amountTenderedStr.substring(0, _amountTenderedStr.length - 1);
-        } else {
-          _amountTenderedStr = "0";
-        }
-      } else {
-        if (_amountTenderedStr == "0") {
-          _amountTenderedStr = value;
-        } else {
-          // Límite extendido para permitir montos más grandes sin romper la UI
-          if (_amountTenderedStr.length < 10) {
-            _amountTenderedStr += value;
-          }
-        }
-      }
-    });
+  String newValue = _amountTenderedStr;
+
+
+
+  if (value == 'C') {
+    newValue = '0';
+  } else if (value == 'DEL') {
+    if (newValue.length > 1) {
+      newValue = newValue.substring(0, newValue.length - 1);
+    } else {
+      newValue = '0';
+    }
+  } else {
+    if (newValue == '0') {
+      newValue = value;
+    } else if (newValue.length < 10) {
+      newValue += value;
+    }
   }
+
+  setState(() {
+    _amountTenderedStr = newValue;
+
+    _amountController.value = TextEditingValue(
+      text: newValue,
+      selection: TextSelection.collapsed(offset: newValue.length),
+    );
+  });
+}
 
   Future<void> _confirmSale() async {
     if (_isProcessing) return;
@@ -87,6 +98,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     }
   }
+
+    @override
+void dispose() {
+  _amountController.dispose();
+  super.dispose();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -139,16 +156,48 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         const SizedBox(height: 8),
                         // Uso de FittedBox para adaptar números gigantes en el display
                         SizedBox(
-                          height: 60, // Forzamos una altura para que crezca adecuadamente
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              '\$${_amountTendered.toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'monospace'),
-                            ),
-                          ),
-                        ),
+  height: 60,
+  child: TextField(
+    controller: _amountController,
+    keyboardType: const TextInputType.numberWithOptions(
+      decimal: true,
+    ),
+    inputFormatters: [
+      TextInputFormatter.withFunction((oldValue, newValue) {
+        final text = newValue.text.replaceAll(',', '.');
+
+        if (RegExp(r'^\d*\.?\d{0,2}$').hasMatch(text)) {
+          return TextEditingValue(
+            text: text,
+            selection: TextSelection.collapsed(
+              offset: text.length,
+            ),
+          );
+        }
+
+        return oldValue;
+      }),
+    ],
+    textAlign: TextAlign.right,
+    style: const TextStyle(
+      fontSize: 48,
+      fontWeight: FontWeight.bold,
+      color: Colors.white,
+      fontFamily: 'monospace',
+    ),
+    decoration: const InputDecoration(
+      border: InputBorder.none,
+      enabledBorder: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      contentPadding: EdgeInsets.zero,
+    ),
+    onChanged: (value) {
+      setState(() {
+        _amountTenderedStr = value;
+      });
+    },
+  ),
+),
                       ],
                     ),
                   ),
@@ -279,10 +328,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildPaymentMethodBtn(IconData icon, String label) {
     final isSelected = _paymentMethod == label;
     return InkWell(
-      onTap: () => setState(() {
-        _paymentMethod = label;
-        if (label == "Tarjeta") _amountTenderedStr = widget.totalToPay.toStringAsFixed(0);
-      }),
+      onTap: () {
+  setState(() {
+    _paymentMethod = label;
+
+    if (label == "Tarjeta") {
+      _amountTenderedStr = widget.totalToPay.toStringAsFixed(2);
+    }
+
+    _amountController.value = TextEditingValue(
+      text: _amountTenderedStr,
+      selection: TextSelection.collapsed(
+        offset: _amountTenderedStr.length,
+      ),
+    );
+  });
+},
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
